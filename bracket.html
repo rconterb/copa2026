@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=6.0">
+<meta name="theme-color" content="#071407">
+<title>Copa 2026 · Grupos & Chaveamento</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  :root{
+    --verde:#009739;--amarelo:#ffd700;--card:#102a12;--card2:#16361a;
+    --linha:#2a4a2c;--txt:#e8f5e9;--txt2:#8fb895;--win:#1eb85a;--br:#ffd700;
+    --q1:#1eb85a;--q2:#3a8f4d;--q3:#b8902a;--out:#5a3030;
+  }
+  html,body{background:#071407;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--txt);min-height:100vh;padding-bottom:28px;}
+  header{
+    text-align:center;padding:14px 14px 10px;background:linear-gradient(135deg,var(--verde),#006b29);
+    border-bottom:3px solid var(--amarelo);position:sticky;top:0;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.5);
+  }
+  header h1{font-size:16px;font-weight:800;}
+  header .sub{font-size:10px;color:rgba(255,255,255,.85);margin-top:2px;}
+  .tabs{display:flex;gap:6px;justify-content:center;margin-top:10px;}
+  .tabs button{flex:0 0 auto;background:rgba(255,255,255,.16);border:none;color:#fff;font-size:12px;font-weight:700;padding:8px 16px;border-radius:9px;cursor:pointer;font-family:inherit;}
+  .tabs button.active{background:#fff;color:var(--verde);}
+  .tabs button:active{transform:scale(.96);}
+
+  .bar{display:flex;gap:8px;justify-content:center;margin:10px 0 0;flex-wrap:wrap;}
+  .bar button{background:var(--card);border:1px solid var(--linha);color:var(--txt);font-size:11px;font-weight:700;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit;}
+  .bar button.reset{background:rgba(255,80,80,.18);border-color:rgba(255,80,80,.3);}
+  .bar button:active{transform:scale(.95);}
+
+  /* ===== GRUPOS ===== */
+  .groups-wrap{max-width:560px;margin:0 auto;padding:12px 12px 0;}
+  .gintro{font-size:11px;color:var(--txt2);line-height:1.6;text-align:center;padding:0 4px 10px;}
+  .gintro b{color:var(--amarelo);}
+  .ggrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media(max-width:430px){.ggrid{grid-template-columns:1fr;}}
+  .grp{background:var(--card);border:1px solid var(--linha);border-radius:11px;overflow:hidden;}
+  .grp h3{font-size:12px;font-weight:800;color:var(--amarelo);padding:8px 10px;background:rgba(0,0,0,.25);display:flex;justify-content:space-between;align-items:center;}
+  .grp h3 .gdates{font-size:8.5px;color:var(--txt2);font-weight:700;}
+  .row{display:flex;align-items:center;gap:7px;padding:8px 9px;font-size:12.5px;border-top:1px solid rgba(255,255,255,.05);cursor:grab;}
+  .row:first-of-type{border-top:none;}
+  .row.dragging{opacity:.4;}
+  .row.over{border-top:2px solid var(--amarelo);}
+  .pos{font-size:10px;font-weight:800;width:20px;height:20px;line-height:20px;text-align:center;border-radius:5px;flex-shrink:0;color:#0a1f0a;}
+  .pos.p1{background:var(--q1);} .pos.p2{background:var(--q2);color:#fff;}
+  .pos.p3{background:var(--q3);} .pos.p4{background:#444;color:#bbb;}
+  .row .fl{font-size:14px;}
+  .row .nm{flex:1;font-weight:600;}
+  .row.br .nm{color:var(--br);font-weight:800;}
+  .grip{color:var(--txt2);font-size:13px;}
+  .row .q3tag{font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;}
+  .q3tag.in{background:var(--q1);color:#0a1f0a;} .q3tag.out{background:var(--out);color:#e8b0b0;}
+
+  .third-panel{max-width:560px;margin:14px auto 0;background:var(--card);border:1px solid var(--linha);border-radius:11px;padding:12px;}
+  .third-panel h4{font-size:12px;color:var(--amarelo);margin-bottom:6px;}
+  .third-panel p{font-size:11px;color:var(--txt2);line-height:1.6;}
+  .thirds-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+  .third-chip{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 9px;border-radius:7px;background:var(--card2);border:1px solid var(--linha);cursor:pointer;}
+  .third-chip.in{border-color:var(--q1);background:rgba(30,184,90,.15);}
+  .third-chip.out{opacity:.45;}
+  .third-chip .fl{font-size:13px;}
+  .third-counter{font-size:11px;font-weight:800;margin-top:8px;}
+  .third-counter.ok{color:var(--q1);} .third-counter.bad{color:#ff8080;}
+
+  /* ===== BRACKET ===== */
+  .hint{font-size:10.5px;color:var(--txt2);text-align:center;padding:9px 16px 0;line-height:1.5;}
+  .hint b{color:var(--amarelo);}
+  .scroller{overflow:auto;padding:8px 0 14px;-webkit-overflow-scrolling:touch;}
+  .stage{position:relative;}
+  svg.wires{position:absolute;top:0;left:0;pointer-events:none;z-index:1;}
+  .bracket{position:relative;z-index:2;}
+  .tie{background:var(--card);border:1px solid var(--linha);border-radius:7px;overflow:hidden;width:140px;box-shadow:0 1px 4px rgba(0,0,0,.3);}
+  .tie.has-br{border-color:rgba(255,215,0,.55);box-shadow:0 0 0 1px rgba(255,215,0,.15);}
+  .mid{display:flex;flex-direction:column;align-items:center;gap:0;padding:2px 2px 3px;background:rgba(0,0,0,.32);}
+  .mid .tlbl{font-size:7px;color:var(--txt2);font-weight:600;letter-spacing:.3px;}
+  .mid .tdate{font-size:9px;color:var(--amarelo);font-weight:800;}
+  .mid .tcity{font-size:7px;color:var(--txt2);font-weight:600;}
+  .pick{display:flex;align-items:center;gap:5px;padding:5px 6px;cursor:pointer;font-size:11px;min-height:28px;transition:background .12s;}
+  .pick+.pick{border-top:1px solid rgba(255,255,255,.07);}
+  .pick:active{background:rgba(255,255,255,.07);}
+  .pick .fl{font-size:12px;flex-shrink:0;}
+  .pick .nm{flex:1;font-weight:600;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pick .sd{color:var(--txt2);font-size:8.5px;font-weight:600;flex-shrink:0;}
+  .pick.empty .nm{color:var(--txt2);font-style:italic;}
+  .pick.won{background:linear-gradient(90deg,rgba(30,184,90,.3),rgba(30,184,90,.05));}
+  .pick.won .nm{color:#fff;font-weight:800;}
+  .pick.lost{opacity:.38;}
+  .pick.br .nm{color:var(--br);font-weight:800;}
+  .pick.br.won{background:linear-gradient(90deg,rgba(255,215,0,.32),rgba(255,215,0,.05));}
+  .champ-box{text-align:center;background:linear-gradient(135deg,#ffd700,#ffb300);color:#0a1f0a;border-radius:10px;padding:9px 6px;font-weight:800;width:130px;}
+  .champ-box small{display:block;font-size:8px;letter-spacing:1px;opacity:.7;}
+  .champ-box .c-name{font-size:14px;margin-top:2px;}
+  .champ-box .trophy{font-size:20px;}
+
+  .footer{font-size:10.5px;color:var(--txt2);line-height:1.6;padding:8px 18px;max-width:600px;margin:0 auto;}
+  .footer b{color:var(--amarelo);}
+  .hidden{display:none;}
+
+  /* ===== CALENDÁRIO ===== */
+  .cal-wrap{max-width:600px;margin:0 auto;padding:12px;}
+  .cal-sub{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:14px;margin-bottom:14px;}
+  .cal-actions{display:flex;gap:8px;margin-bottom:10px;}
+  .cal-tog{flex:1;background:#0a1f0a;border:1px solid var(--linha);color:var(--txt2);font-size:12px;font-weight:700;padding:9px;border-radius:9px;cursor:pointer;font-family:inherit;}
+  .cal-tog.active{background:var(--verde);color:#fff;border-color:var(--verde);}
+  .cal-sync{display:flex;flex-direction:column;gap:8px;}
+  .cal-btn{display:block;text-align:center;background:linear-gradient(135deg,#1eb85a,#009739);color:#fff;text-decoration:none;font-weight:800;font-size:13px;padding:11px;border-radius:10px;}
+  .cal-btn.ghost{background:transparent;border:1px solid var(--linha);color:var(--txt);font-weight:700;}
+  .cal-btn:active{transform:scale(.98);}
+  .cal-note{font-size:10.5px;color:var(--txt2);line-height:1.5;margin-top:10px;}
+  .cal-list{display:flex;flex-direction:column;gap:7px;}
+  .cal-loading{text-align:center;color:var(--txt2);padding:30px;font-size:13px;}
+  .cal-day{font-size:11px;font-weight:800;color:var(--amarelo);text-transform:uppercase;letter-spacing:.5px;margin:12px 2px 2px;}
+  .cal-game{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--linha);border-radius:9px;padding:9px 11px;}
+  .cal-game.br{border-color:rgba(255,215,0,.5);background:linear-gradient(135deg,#16320f,#0f2410);}
+  .cal-time{font-size:12px;font-weight:800;color:#fff;min-width:42px;text-align:center;}
+  .cal-match{flex:1;font-size:12.5px;font-weight:600;line-height:1.25;}
+  .cal-match .gp{color:var(--txt2);font-size:10px;font-weight:600;}
+  .cal-match .sc{color:var(--amarelo);font-weight:800;}
+  .cal-loc{font-size:9.5px;color:var(--txt2);text-align:right;max-width:90px;line-height:1.2;}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏆 Copa 2026</h1>
+  <div class="sub">Grupos · Chaveamento · Calendário</div>
+  <div class="tabs">
+    <button id="tabGrupos" class="active">📋 Grupos</button>
+    <button id="tabBracket">🏆 Chaveamento</button>
+    <button id="tabCalendario">📅 Calendário</button>
+  </div>
+</header>
+
+<div id="diag" style="display:none;background:#5a1a1a;color:#ffd0d0;font:12px monospace;padding:10px 14px;margin:8px;border-radius:8px;white-space:pre-wrap;word-break:break-word;"></div>
+
+<!-- ============ ABA GRUPOS ============ -->
+<div id="view-grupos">
+  <div class="bar"><button id="btnGfav" class="reset">↺ Restaurar prováveis</button></div>
+  <div class="groups-wrap">
+    <div class="gintro">
+      Arraste as seleções para mudar a ordem (<b>1º, 2º, 3º, 4º</b>). 1º e 2º se classificam direto. Os <b>3ºs</b> disputam entre si — só os <b>8 melhores</b> avançam (marque embaixo). Mudou aqui? O <b>chaveamento se refaz sozinho.</b> 🕒 Datas/horários de <b>Brasília</b>.
+    </div>
+    <div class="ggrid" id="ggrid"></div>
+
+    <div class="third-panel">
+      <h4>⚖️ Melhores terceiros (escolha 8 de 12)</h4>
+      <p>A FIFA classifica os 3ºs por pontos → saldo de gols → gols marcados → fair play. Aqui você marca quais 8 avançam (os outros 4 caem). Toque para marcar/desmarcar.</p>
+      <div class="thirds-list" id="thirdsList"></div>
+      <div class="third-counter" id="thirdCounter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ABA BRACKET ============ -->
+<div id="view-bracket" class="hidden">
+  <div class="bar">
+    <button id="btnReset" class="reset">↺ Limpar palpites</button>
+    <button id="btnFav">⭐ Prováveis</button>
+  </div>
+  <div class="hint">Toque em quem <b>vence</b> — sobe sozinho e a linha acende. Toque de novo pra apagar. Arraste pra ver tudo. <b>Brasil em dourado.</b> 🕒 Horários de <b>Brasília</b>.</div>
+  <div class="scroller"><div class="stage" id="stage"><svg class="wires" id="wires"></svg><div class="bracket" id="bracket"></div></div></div>
+  <div class="footer" id="footer"></div>
+</div>
+
+<!-- ============ ABA CALENDÁRIO ============ -->
+<div id="view-calendario" class="hidden">
+  <div class="cal-wrap">
+    <div class="cal-sub">
+      <div class="cal-actions">
+        <button id="calAll" class="cal-tog active">Todos os jogos</button>
+        <button id="calBr" class="cal-tog">Só o Brasil 🇧🇷</button>
+      </div>
+      <div class="cal-sync">
+        <a id="subscribeBtn" href="#" class="cal-btn">➕ Assinar no Google (atualiza sozinho)</a>
+        <a id="downloadBtn" href="#" class="cal-btn ghost">⬇️ Baixar .ics</a>
+      </div>
+      <p class="cal-note">🕒 Horários de Brasília. Lembretes: Brasil avisa 1 dia, 2h e 1h antes; seleções principais 2h e 1h antes. Assinando, o calendário atualiza sozinho com placares e os jogos do mata-mata conforme são definidos.</p>
+    </div>
+    <div id="calList" class="cal-list"><div class="cal-loading">Carregando jogos…</div></div>
+  </div>
+</div>
+
+<script>
+/* ===================== DADOS BASE: 12 grupos oficiais ===================== */
+const FL={México:"🇲🇽",AfricaSul:"🇿🇦",CoreiaSul:"🇰🇷",RepTcheca:"🇨🇿",
+  Canada:"🇨🇦",Bosnia:"🇧🇦",Catar:"🇶🇦",Suica:"🇨🇭",
+  Brasil:"🇧🇷",Marrocos:"🇲🇦",Haiti:"🇭🇹",Escócia:"🏴",
+  EUA:"🇺🇸",Paraguai:"🇵🇾",Australia:"🇦🇺",Turquia:"🇹🇷",
+  Alemanha:"🇩🇪",Curacao:"🇨🇼",CostaMarfim:"🇨🇮",Equador:"🇪🇨",
+  Holanda:"🇳🇱",Japao:"🇯🇵",Suecia:"🇸🇪",Tunisia:"🇹🇳",
+  Belgica:"🇧🇪",Egito:"🇪🇬",Ira:"🇮🇷",NovaZelandia:"🇳🇿",
+  Espanha:"🇪🇸",CaboVerde:"🇨🇻",ArabiaSaudita:"🇸🇦",Uruguai:"🇺🇾",
+  Franca:"🇫🇷",Senegal:"🇸🇳",Iraque:"🇮🇶",Noruega:"🇳🇴",
+  Argentina:"🇦🇷",Argelia:"🇩🇿",Austria:"🇦🇹",Jordania:"🇯🇴",
+  Portugal:"🇵🇹",RDCongo:"🇨🇩",Uzbequistao:"🇺🇿",Colombia:"🇨🇴",
+  Inglaterra:"🏴",Croacia:"🇭🇷",Gana:"🇬🇭",Panama:"🇵🇦"};
+const NM={CoreiaSul:"Coreia Sul",RepTcheca:"Rep. Tcheca",AfricaSul:"África Sul",
+  CostaMarfim:"C. Marfim",NovaZelandia:"N. Zelândia",ArabiaSaudita:"Arábia S.",
+  CaboVerde:"Cabo Verde",RDCongo:"RD Congo"};
+function disp(n){return NM[n]||n;}
+
+/* ordem inicial = provável classificação (favoritos por ranking) */
+const GROUPS_DEFAULT={
+  A:["México","CoreiaSul","RepTcheca","AfricaSul"],
+  B:["Suica","Canada","Catar","Bosnia"],
+  C:["Brasil","Marrocos","Escócia","Haiti"],
+  D:["EUA","Turquia","Paraguai","Australia"],
+  E:["Alemanha","Equador","CostaMarfim","Curacao"],
+  F:["Holanda","Japao","Suecia","Tunisia"],
+  G:["Belgica","Egito","NovaZelandia","Ira"],
+  H:["Espanha","Uruguai","CaboVerde","ArabiaSaudita"],
+  I:["Franca","Senegal","Noruega","Iraque"],
+  J:["Argentina","Austria","Argelia","Jordania"],
+  K:["Portugal","Colombia","RDCongo","Uzbequistao"],
+  L:["Inglaterra","Croacia","Gana","Panama"],
+};
+let GROUPS=JSON.parse(JSON.stringify(GROUPS_DEFAULT));
+/* terceiros escolhidos (8 letras de grupo) — default provável */
+let thirdsIn=new Set(["C","D","F","G","H","I","K","L"]);
+const BR="Brasil";
+
+/* ===== estrutura FIFA da Rodada de 32 ===== 
+   Oficial: os 1ºs dos grupos A,B,D,E,G,I,K,L enfrentam os 8 melhores 3ºs.
+   Os 1ºs de C,F,H,J e os 2ºs se enfrentam entre si.
+   Slots "3?" são DINÂMICOS: recebem um dos 8 terceiros classificados,
+   atribuídos por ordem, evitando que um 1º pegue o 3º do próprio grupo. */
+const R32DEF={
+  // metade ESQUERDA (em ordem de cruzamento p/ linhas retas)
+  M73:["2A","2B"],   M75:["1F","2C"],    // -> M91
+  M74:["1E","3?"],   M77:["1I","3?"],    // -> M89
+  M83:["2K","2L"],   M84:["1H","2J"],    // -> M92
+  M81:["1D","3?"],   M82:["1G","3?"],    // -> M93   (corrigido: 1G, era 1B/3F)
+  // metade DIREITA (lado do Brasil)
+  M76:["1C","2F"],   M78:["2E","2I"],    // -> M90  (Brasil 1C)
+  M79:["1A","3?"],   M80:["1L","3?"],    // -> M94
+  M85:["1B","3?"],   M86:["1J","2H"],    // -> M95   (corrigido: 1B/2H)
+  M87:["1K","3?"],   M88:["2D","2G"],    // -> M96   (corrigido: 2D x 2G)
+};
+/* ordem dos slots de 3º conforme aparecem (grupo do 1º que os recebe) */
+const THIRD_SLOTS=[
+  {match:"M74",host:"E"},{match:"M77",host:"I"},
+  {match:"M81",host:"D"},{match:"M82",host:"G"},
+  {match:"M79",host:"A"},{match:"M80",host:"L"},
+  {match:"M85",host:"B"},{match:"M87",host:"K"},
+];
+const OIT=[
+  {id:"M91",src:["M73","M75"]},{id:"M89",src:["M74","M77"]},
+  {id:"M92",src:["M83","M84"]},{id:"M93",src:["M81","M82"]},
+  {id:"M90",src:["M76","M78"]},{id:"M94",src:["M79","M80"]},
+  {id:"M95",src:["M85","M86"]},{id:"M96",src:["M87","M88"]},
+];
+const QUA=[{id:"M97",src:["M91","M89"]},{id:"M98",src:["M92","M93"]},
+  {id:"M99",src:["M90","M94"]},{id:"M100",src:["M95","M96"]}];
+const SEMI=[{id:"M101",src:["M97","M98"]},{id:"M102",src:["M99","M100"]}];
+const FINAL={id:"M104",src:["M101","M102"]};
+const LEFT={r32:["M73","M75","M74","M77","M83","M84","M81","M82"],oit:["M91","M89","M92","M93"],qua:["M97","M98"],semi:["M101"]};
+const RIGHT={r32:["M76","M78","M79","M80","M85","M86","M87","M88"],oit:["M90","M94","M95","M96"],qua:["M99","M100"],semi:["M102"]};
+
+/* DATAS, HORÁRIOS (Brasília) e CIDADES oficiais (FIFA) de cada partida.
+   {d:data, h:hora Brasília, c:cidade} */
+const INFO={
+  // Rodada de 32 (28 jun – 3 jul)
+  M73:{d:"28/jun",h:"22h",c:"Los Angeles"}, M74:{d:"29/jun",h:"17h",c:"Boston"},
+  M75:{d:"30/jun",h:"21h",c:"Dallas"},      M76:{d:"29/jun",h:"14h",c:"Houston"},
+  M77:{d:"30/jun",h:"01h",c:"Monterrey"},   M78:{d:"30/jun",h:"22h",c:"L. Angeles"},
+  M79:{d:"01/jul",h:"17h",c:"Atlanta"},     M80:{d:"01/jul",h:"23h",c:"Cidade do Méx."},
+  M81:{d:"02/jul",h:"01h",c:"Vancouver"},   M82:{d:"01/jul",h:"20h",c:"Seattle"},
+  M83:{d:"02/jul",h:"23h",c:"NY/NJ"},       M84:{d:"02/jul",h:"17h",c:"Filadélfia"},
+  M85:{d:"03/jul",h:"22h",c:"Miami"},       M86:{d:"03/jul",h:"19h",c:"S. Francisco"},
+  M87:{d:"04/jul",h:"01h",c:"Kansas City"}, M88:{d:"03/jul",h:"16h",c:"Toronto"},
+  // Oitavas (4–7 jul)
+  M89:{d:"04/jul",h:"17h",c:"Filadélfia"},  M90:{d:"05/jul",h:"17h",c:"NY/NJ"},
+  M91:{d:"06/jul",h:"21h",c:"Dallas"},      M92:{d:"06/jul",h:"20h",c:"Seattle"},
+  M93:{d:"04/jul",h:"23h",c:"Cidade do Méx."},M94:{d:"05/jul",h:"20h",c:"Atlanta"},
+  M95:{d:"07/jul",h:"22h",c:"Vancouver"},   M96:{d:"07/jul",h:"18h",c:"Kansas City"},
+  // Quartas (9–11 jul)
+  M97:{d:"09/jul",h:"17h",c:"Boston"},      M98:{d:"10/jul",h:"22h",c:"Los Angeles"},
+  M99:{d:"11/jul",h:"14h",c:"Miami"},       M100:{d:"11/jul",h:"18h",c:"Kansas City"},
+  // Semis (14–15 jul)
+  M101:{d:"14/jul",h:"16h",c:"Dallas"},     M102:{d:"15/jul",h:"16h",c:"Atlanta"},
+  // Final (19 jul)
+  M104:{d:"19/jul",h:"16h",c:"NY/NJ"},
+};
+
+/* ===== atribuição dinâmica dos 8 melhores 3ºs aos 8 slots "3?" =====
+   Pega os grupos com 3º classificado (thirdsIn) e os distribui pelos slots,
+   tentando não dar a um 1º o 3º do próprio grupo. Sempre preenche os 8
+   slots se houver 8 terceiros — nunca deixa ninguém sem adversário. */
+let thirdAssign={}; // matchId -> letra do grupo do 3º
+function assignThirds(){
+  thirdAssign={};
+  const groups=[...thirdsIn];               // grupos com 3º classificado
+  const slots=THIRD_SLOTS.map(s=>({...s}));  // {match, host}
+  if(groups.length!==8){ return; }           // só monta quando exatamente 8
+  // backtracking simples p/ casar slot↔grupo evitando host==grupo
+  const used=new Set();
+  function solve(i){
+    if(i===slots.length) return true;
+    const host=slots[i].host;
+    // tenta primeiro grupos != host
+    const cand=groups.filter(g=>!used.has(g)).sort((a,b)=>(a===host)-(b===host));
+    for(const g of cand){
+      used.add(g); thirdAssign[slots[i].match]=g;
+      if(solve(i+1)) return true;
+      used.delete(g); delete thirdAssign[slots[i].match];
+    }
+    return false;
+  }
+  if(!solve(0)){ // fallback: atribui em ordem mesmo com conflito
+    slots.forEach((s,i)=>thirdAssign[s.match]=groups[i]);
+  }
+}
+
+/* resolve um seed dentro de um confronto -> objeto seleção atual */
+function teamFromSeed(seed, matchId){
+  const pos=+seed[0];
+  if(seed==="3?"){
+    const g=thirdAssign[matchId];
+    if(!g) return null;                       // sem 3º atribuído (≠8 marcados)
+    const n=GROUPS[g][2]; if(!n) return null;
+    return {fl:FL[n]||"⚽",nm:disp(n),seed:"3"+g,raw:n,br:n===BR};
+  }
+  const g=seed.slice(1);
+  const arr=GROUPS[g]; if(!arr) return null;
+  const n=arr[pos-1]; if(!n) return null;
+  return {fl:FL[n]||"⚽",nm:disp(n),seed,raw:n,br:n===BR};
+}
+
+/* ===== estado de palpites do bracket ===== */
+let winners={};
+const ALLM=[...OIT,...QUA,...SEMI,FINAL];
+function comp(id){
+  if(R32DEF[id])return R32DEF[id].map(s=>teamFromSeed(s,id));
+  const t=ALLM.find(x=>x.id===id); if(!t)return[null,null];
+  return [winners[t.src[0]]||null,winners[t.src[1]]||null];
+}
+const FORCA={Brasil:97,Franca:96,Espanha:95,Argentina:94,Inglaterra:92,Portugal:90,
+  Alemanha:89,Holanda:88,Belgica:84,Croacia:83,Uruguai:82,Colombia:80,Marrocos:79,
+  Senegal:78,Japao:76,México:75,EUA:74,Suica:73,Equador:72,Noruega:74,Suecia:72,
+  CoreiaSul:71,Austria:70,Egito:66,Turquia:66,Paraguai:65,Canada:64,Gana:63,
+  CaboVerde:60,NovaZelandia:55,RDCongo:62,Haiti:50,Curacao:48,Tunisia:64,Ira:63,
+  ArabiaSaudita:58,Jordania:55,Argelia:64,Uzbequistao:58,Catar:57,Bosnia:66,
+  RepTcheca:67,AfricaSul:60,Australia:63,Panama:56,CostaMarfim:68,Iraque:54};
+function stronger(c){if(!c[0])return c[1];if(!c[1])return c[0];if(c[0].br)return c[0];if(c[1].br)return c[1];
+  return (FORCA[c[0].raw]||50)>=(FORCA[c[1].raw]||50)?c[0]:c[1];}
+function recalcFav(){assignThirds();winners={};
+  [...LEFT.r32,...RIGHT.r32].forEach(id=>{const w=stronger(comp(id));if(w)winners[id]=w;});
+  [...OIT,...QUA,...SEMI,FINAL].forEach(t=>{const w=stronger(comp(t.id));if(w)winners[t.id]=w;});}
+function pick(id,idx){const c=comp(id),ch=c[idx];if(!ch)return;
+  if(winners[id]&&winners[id].raw===ch.raw)clr(id);else{winners[id]=ch;prop(id);}drawBracket();}
+function clr(id){delete winners[id];prop(id);}
+function prop(id){const ch=ALLM.find(x=>x.src&&x.src.includes(id));if(ch){delete winners[ch.id];prop(ch.id);}}
+
+/* ============ RENDER GRUPOS ============ */
+/* janelas de jogos da fase de grupos (11–27 jun), horário de Brasília.
+   Grupo C (Brasil) com horários exatos confirmados pela FIFA. */
+const GDATES={
+  A:"11, 18, 24 jun", B:"13, 18, 24 jun", C:"13·19h · 19·21h30 · 24·19h",
+  D:"12, 18, 25 jun", E:"13, 20, 25 jun", F:"14, 20, 25 jun",
+  G:"15, 21, 27 jun", H:"15, 21, 26 jun", I:"16, 22, 26 jun",
+  J:"16, 22, 27 jun", K:"16, 23, 27 jun", L:"17, 23, 27 jun",
+};
+function renderGroups(){
+  const grid=document.getElementById('ggrid');let h="";
+  for(const g of Object.keys(GROUPS)){
+    h+=`<div class="grp"><h3>Grupo ${g} <span class="gdates">📅 ${GDATES[g]||""}</span></h3>`;
+    GROUPS[g].forEach((n,i)=>{
+      const pos=i+1; const isBr=n===BR;
+      let tag="";
+      if(pos===3){const inn=thirdsIn.has(g);tag=`<span class="q3tag ${inn?'in':'out'}">${inn?'CLASSIF.':'FORA'}</span>`;}
+      h+=`<div class="row ${isBr?'br':''}" draggable="true" data-g="${g}" data-i="${i}">
+        <span class="pos p${pos}">${pos}º</span>
+        <span class="fl">${FL[n]||"⚽"}</span>
+        <span class="nm">${disp(n)}</span>${tag}
+        <span class="grip">⠿</span></div>`;
+    });
+    h+=`</div>`;
+  }
+  grid.innerHTML=h;
+  bindDrag();
+  renderThirds();
+}
+function renderThirds(){
+  const list=document.getElementById('thirdsList');let h="";
+  for(const g of Object.keys(GROUPS)){
+    const n=GROUPS[g][2]; const inn=thirdsIn.has(g);
+    h+=`<div class="third-chip ${inn?'in':'out'}" data-g="${g}">
+      <span class="fl">${FL[n]||"⚽"}</span>${disp(n)} <small>(${g})</small></div>`;
+  }
+  list.innerHTML=h;
+  list.querySelectorAll('.third-chip').forEach(el=>el.addEventListener('click',()=>{
+    const g=el.dataset.g;
+    if(thirdsIn.has(g))thirdsIn.delete(g); else thirdsIn.add(g);
+    syncCounter(); renderGroups(); recalcFav();
+  }));
+  syncCounter();
+}
+function syncCounter(){
+  const c=document.getElementById('thirdCounter');const n=thirdsIn.size;
+  if(n===8){c.textContent="8/8 terceiros selecionados ✓ — chaveamento completo";c.className="third-counter ok";}
+  else{c.textContent=`${n}/8 terceiros — ${n>8?"remova "+(n-8):"faltam "+(8-n)} (o chaveamento só fica completo com 8)`;c.className="third-counter bad";}
+}
+
+/* drag & drop dentro do grupo */
+let dragEl=null;
+function bindDrag(){
+  document.querySelectorAll('.row').forEach(row=>{
+    row.addEventListener('dragstart',e=>{dragEl=row;row.classList.add('dragging');});
+    row.addEventListener('dragend',()=>{dragEl=null;document.querySelectorAll('.row').forEach(r=>r.classList.remove('dragging','over'));});
+    row.addEventListener('dragover',e=>{e.preventDefault();
+      if(dragEl&&dragEl!==row&&dragEl.dataset.g===row.dataset.g){row.classList.add('over');}});
+    row.addEventListener('dragleave',()=>row.classList.remove('over'));
+    row.addEventListener('drop',e=>{e.preventDefault();
+      if(!dragEl||dragEl.dataset.g!==row.dataset.g)return;
+      const g=row.dataset.g,from=+dragEl.dataset.i,to=+row.dataset.i;
+      const arr=GROUPS[g];const[m]=arr.splice(from,1);arr.splice(to,0,m);
+      renderGroups();recalcFav();
+    });
+    // toque: clique sobe a seleção 1 posição (alternativa ao arrasto no celular)
+    row.addEventListener('click',()=>{
+      const g=row.dataset.g,i=+row.dataset.i;if(i===0)return;
+      const arr=GROUPS[g];[arr[i-1],arr[i]]=[arr[i],arr[i-1]];
+      renderGroups();recalcFav();
+    });
+  });
+}
+
+/* ============ RENDER BRACKET (layout espelhado + linhas) ============ */
+const TIE_W=140,TIE_H=74,CHAMP_H=64,COL_GAP=34;
+const COLS=["r32","oit","qua","semi","final","semi","qua","oit","r32"];
+let layout={};
+function buildLayout(){
+  layout={};const colW=TIE_W,gap=COL_GAP;const xs=[];let x=4;
+  COLS.forEach(()=>{xs.push(x);x+=colW+gap;});const totalW=x-gap+4;
+  const vgap=14,slotH=TIE_H+vgap,stageH=8*slotH+8;
+  function ys(k){const out=[],step=stageH/k;for(let i=0;i<k;i++)out.push(8+step*i+step/2-TIE_H/2);return out;}
+  const place=(ids,X,Y)=>ids.forEach((id,i)=>layout[id]={x:X,y:Y[i],w:TIE_W,h:TIE_H});
+  place(LEFT.r32,xs[0],ys(8));place(LEFT.oit,xs[1],ys(4));place(LEFT.qua,xs[2],ys(2));place(LEFT.semi,xs[3],ys(1));
+  layout[FINAL.id]={x:xs[4],y:stageH/2-TIE_H/2,w:TIE_W,h:TIE_H};
+  layout["CHAMP"]={x:xs[4],y:stageH/2+TIE_H/2+16,w:TIE_W,h:CHAMP_H};
+  place(RIGHT.semi,xs[5],ys(1));place(RIGHT.qua,xs[6],ys(2));place(RIGHT.oit,xs[7],ys(4));place(RIGHT.r32,xs[8],ys(8));
+  return {w:totalW,h:stageH+8};
+}
+function slot(id,idx,team){
+  const w=winners[id];let cls="pick";
+  if(!team)return `<div class="pick empty"><span class="fl">·</span><span class="nm">a definir</span></div>`;
+  if(team.br)cls+=" br";if(w)cls+=(w.raw===team.raw)?" won":" lost";
+  return `<div class="${cls}" data-tie="${id}" data-idx="${idx}"><span class="fl">${team.fl}</span><span class="nm">${team.nm}</span><span class="sd">${team.seed||""}</span></div>`;
+}
+function tieBox(id){const c=comp(id);const hb=(c[0]&&c[0].br)||(c[1]&&c[1].br);const L=layout[id];
+  const info=INFO[id]||{};
+  const lab=(id===FINAL.id)?"🏆 FINAL":id;
+  const dateLine=info.d?`<span class="tdate">📅 ${info.d} · ${info.h||""}</span><span class="tcity">${info.c||""}</span>`:"";
+  return `<div class="tie ${hb?'has-br':''}" style="position:absolute;left:${L.x}px;top:${L.y}px;"><div class="mid"><span class="tlbl">${lab}</span>${dateLine}</div>${slot(id,0,c[0])}${slot(id,1,c[1])}</div>`;}
+function drawBracket(){
+  assignThirds();
+  const dim=buildLayout();
+  const stage=document.getElementById('stage'),br=document.getElementById('bracket');
+  stage.style.width=dim.w+'px';stage.style.height=dim.h+'px';br.style.width=dim.w+'px';br.style.height=dim.h+'px';
+  let html="";[...LEFT.r32,...RIGHT.r32].forEach(id=>html+=tieBox(id));
+  OIT.forEach(t=>html+=tieBox(t.id));QUA.forEach(t=>html+=tieBox(t.id));SEMI.forEach(t=>html+=tieBox(t.id));
+  html+=tieBox(FINAL.id);
+  const ch=winners[FINAL.id],L=layout["CHAMP"];
+  html+=`<div class="champ-box" style="position:absolute;left:${L.x}px;top:${L.y}px;"><div class="trophy">🏆</div><small>CAMPEÃO</small><div class="c-name">${ch?ch.fl+" "+ch.nm:"—"}</div></div>`;
+  br.innerHTML=html;
+  br.querySelectorAll('.pick[data-tie]').forEach(el=>el.addEventListener('click',()=>pick(el.dataset.tie,+el.dataset.idx)));
+  drawWires(dim);renderFooter();
+}
+function drawWires(dim){
+  const svg=document.getElementById('wires');
+  svg.setAttribute('width',dim.w);svg.setAttribute('height',dim.h);svg.setAttribute('viewBox',`0 0 ${dim.w} ${dim.h}`);
+  let p="";
+  function connect(srcId,dstId,side){const s=layout[srcId],d=layout[dstId];if(!s||!d)return;
+    let sx,sy=s.y+s.h/2,dx,dy=d.y+d.h/2;
+    if(side==='L'){sx=s.x+s.w;dx=d.x;}else{sx=s.x;dx=d.x+d.w;}
+    const mx=(sx+dx)/2;const lit=winners[srcId];const isBr=lit&&lit.br;
+    const col=lit?(isBr?'#ffd700':'#1eb85a'):'#3c6b40';const wd=lit?(isBr?2.4:1.8):1;
+    p+=`<path d="M${sx},${sy} H${mx} V${dy} H${dx}" fill="none" stroke="${col}" stroke-width="${wd}" opacity="${lit ? 0.95 : 0.5}"/>`;}
+  const pair=(srcA,dstA,side)=>dstA.forEach((dst,i)=>{connect(srcA[i*2],dst,side);connect(srcA[i*2+1],dst,side);});
+  pair(LEFT.r32,LEFT.oit,'L');pair(LEFT.oit,LEFT.qua,'L');pair(LEFT.qua,LEFT.semi,'L');connect(LEFT.semi[0],FINAL.id,'L');
+  pair(RIGHT.r32,RIGHT.oit,'R');pair(RIGHT.oit,RIGHT.qua,'R');pair(RIGHT.qua,RIGHT.semi,'R');connect(RIGHT.semi[0],FINAL.id,'R');
+  svg.innerHTML=p;
+}
+function renderFooter(){
+  const f=document.getElementById('footer');
+  const path=["M76","M90","M99","M102","M104"];
+  const names=["R32 (29/jun)","Oitavas (5/jul)","Quartas (11/jul)","Semi (15/jul)","Final (19/jul)"];
+  let alive=true,txt=[];
+  path.forEach((id,i)=>{const w=winners[id];if(!alive)return;
+    if(w&&w.br)txt.push("✅ "+names[i]);
+    else if(w&&!w.br){txt.push("❌ saiu na "+names[i]);alive=false;}
+    else{txt.push("⏳ "+names[i]);alive=false;}});
+  f.innerHTML=`<b>Caminho do Brasil:</b> ${txt.join(" · ")}<br><br>
+  O chaveamento é montado a partir da aba <b>Grupos</b>: 1º e 2º entram direto, e os 8 terceiros que você marcou preenchem os slots "3X". Mude a ordem dos grupos ou os terceiros e tudo aqui se refaz. Estrutura de confrontos e datas: oficiais FIFA.`;
+}
+
+/* ============ ABAS ============ */
+function show(tab){
+  document.getElementById('view-grupos').classList.toggle('hidden',tab!=='grupos');
+  document.getElementById('view-bracket').classList.toggle('hidden',tab!=='bracket');
+  document.getElementById('view-calendario').classList.toggle('hidden',tab!=='calendario');
+  document.getElementById('tabGrupos').classList.toggle('active',tab==='grupos');
+  document.getElementById('tabBracket').classList.toggle('active',tab==='bracket');
+  document.getElementById('tabCalendario').classList.toggle('active',tab==='calendario');
+  if(tab==='bracket')drawBracket();
+  if(tab==='calendario')loadCalendar();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.getElementById('tabGrupos').onclick=()=>show('grupos');
+document.getElementById('tabBracket').onclick=()=>show('bracket');
+document.getElementById('tabCalendario').onclick=()=>show('calendario');
+document.getElementById('btnGfav').onclick=()=>{GROUPS=JSON.parse(JSON.stringify(GROUPS_DEFAULT));thirdsIn=new Set(["C","D","F","G","H","I","K","L"]);renderGroups();recalcFav();};
+document.getElementById('btnReset').onclick=()=>{winners={};drawBracket();};
+document.getElementById('btnFav').onclick=()=>{recalcFav();drawBracket();};
+
+/* ============ CALENDÁRIO ============ */
+var calMode='all', calData=null;
+function calUrls(){
+  // funciona tanto servido pelo Railway quanto aberto solto
+  var base=location.origin && location.origin.indexOf('http')===0 ? location.origin : '';
+  return {
+    all: base+'/copa2026.ics', br: base+'/brasil.ics', json: base+'/jogos.json'
+  };
+}
+function setCalLinks(){
+  var u=calUrls();
+  var icsPath=(calMode==='br'?u.br:u.all);
+  // webcal:// faz o Google/!Apple abrir direto o fluxo de assinatura
+  var webcal=icsPath.replace(/^https?:/,'webcal:');
+  var gcal='https://calendar.google.com/calendar/r?cid='+encodeURIComponent(webcal);
+  document.getElementById('subscribeBtn').href=gcal;
+  document.getElementById('subscribeBtn').target='_blank';
+  document.getElementById('downloadBtn').href=icsPath;
+}
+function loadCalendar(){
+  setCalLinks();
+  var list=document.getElementById('calList');
+  if(calData){renderCalendar();return;}
+  var u=calUrls();
+  fetch(u.json).then(function(r){return r.json();}).then(function(d){
+    calData=d.matches||[]; renderCalendar();
+  }).catch(function(){
+    list.innerHTML='<div class="cal-loading">Não consegui carregar os jogos agora. '+
+      'Se você abriu o arquivo solto (sem o servidor), use o link do Railway. '+
+      'Mesmo assim, os botões de assinar/baixar acima funcionam.</div>';
+  });
+}
+var MES_PT=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+var DIA_PT=['dom','seg','ter','qua','qui','sex','sáb'];
+function renderCalendar(){
+  var list=document.getElementById('calList');
+  var arr=calData.filter(function(m){
+    if(calMode!=='br')return true;
+    return (m.t1==='Brasil'||m.t2==='Brasil');
+  });
+  if(!arr.length){list.innerHTML='<div class="cal-loading">Sem jogos para mostrar.</div>';return;}
+  var html='', curDay='';
+  arr.forEach(function(m){
+    var dia=m.dia||''; // ex "2026-06-13"
+    if(dia!==curDay){
+      curDay=dia;
+      var lbl=dia;
+      var p=dia.split('-');
+      if(p.length===3){
+        var dd=new Date(+p[0],+p[1]-1,+p[2]);
+        lbl=DIA_PT[dd.getDay()]+', '+(+p[2])+' '+MES_PT[+p[1]-1];
+      }
+      html+='<div class="cal-day">'+lbl+'</div>';
+    }
+    var isBr=(m.t1==='Brasil'||m.t2==='Brasil');
+    var meio = m.placar ? '<span class="sc">'+m.t1+' '+m.placar+' '+m.t2+'</span>'
+                        : m.t1+' x '+m.t2;
+    html+='<div class="cal-game'+(isBr?' br':'')+'">'+
+      '<span class="cal-time">'+(m.hora||'')+'</span>'+
+      '<span class="cal-match">'+meio+'<br><span class="gp">'+(m.fase||'')+'</span></span>'+
+      '<span class="cal-loc">'+(m.local||'')+'</span></div>';
+  });
+  list.innerHTML=html;
+}
+document.getElementById('calAll').onclick=function(){calMode='all';
+  document.getElementById('calAll').classList.add('active');
+  document.getElementById('calBr').classList.remove('active');
+  setCalLinks();renderCalendar();};
+document.getElementById('calBr').onclick=function(){calMode='br';
+  document.getElementById('calBr').classList.add('active');
+  document.getElementById('calAll').classList.remove('active');
+  setCalLinks();renderCalendar();};
+
+/* init — com autodiagnóstico visível (se algo falhar no Safari, mostra na tela) */
+window.addEventListener('error',function(ev){
+  var d=document.getElementById('diag');
+  if(d){d.style.display='block';
+    d.textContent='ERRO: '+(ev.message||ev.error)+'  @linha '+(ev.lineno||'?')+':'+(ev.colno||'?');}
+});
+try{
+  renderGroups();
+  recalcFav();
+}catch(e){
+  var d=document.getElementById('diag');
+  if(d){d.style.display='block';d.textContent='ERRO init: '+(e&&e.message?e.message:e)+'  ['+(e&&e.name?e.name:'')+']';}
+}
+</script>
+</body>
+</html>

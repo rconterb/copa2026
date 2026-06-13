@@ -28,7 +28,10 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from fastapi import FastAPI, Response
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, FileResponse
+from pathlib import Path
+
+BASE_DIR = Path(__file__).parent
 
 # ----------------------------------------------------------------------------
 # Configuração
@@ -272,12 +275,62 @@ def calendario_brasil():
                     headers={"Content-Disposition": "inline; filename=brasil.ics"})
 
 
+@app.get("/jogos.json")
+def jogos_json():
+    """Jogos em JSON simples (português, horário de Brasília) para a aba Calendário."""
+    out = []
+    for mt in fetch_matches():
+        start = parse_kickoff(mt.get("date", ""), mt.get("time", ""))
+        if start is None:
+            continue
+        score = mt.get("score") or {}
+        ft = score.get("ft")
+        placar = f"{ft[0]} x {ft[1]}" if ft and len(ft) == 2 else None
+        rnd = round_pt(mt.get("round", ""))
+        grp = mt.get("group", "")
+        out.append({
+            "dia": start.strftime("%Y-%m-%d"),
+            "hora": start.strftime("%Hh%M").replace("h00", "h"),
+            "t1": team_pt(mt.get("team1", "")),
+            "t2": team_pt(mt.get("team2", "")),
+            "placar": placar,
+            "fase": grp or rnd,
+            "local": mt.get("ground", ""),
+            "ts": start.isoformat(),
+        })
+    out.sort(key=lambda x: x["ts"])
+    return {"matches": out}
+
+
 @app.get("/health")
 def health():
     return {"ok": True, "matches_cached": len(_cache["data"] or [])}
 
 
+def _serve_app():
+    f = BASE_DIR / "bracket.html"
+    if f.exists():
+        return FileResponse(str(f), media_type="text/html; charset=utf-8")
+    return HTMLResponse("<h1>bracket.html não encontrado no servidor</h1>", status_code=404)
+
+
 @app.get("/", response_class=HTMLResponse)
+def root():
+    """App consolidado: Grupos + Chaveamento + Calendário."""
+    return _serve_app()
+
+
+@app.get("/bracket", response_class=HTMLResponse)
+def bracket():
+    return _serve_app()
+
+
+@app.get("/app", response_class=HTMLResponse)
+def app_alias():
+    return _serve_app()
+
+
+@app.get("/info", response_class=HTMLResponse)
 def home():
     return """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -292,6 +345,10 @@ a{color:#1eb85a}ol{padding-left:20px}li{margin:6px 0}
 <h1>🏆 Copa 2026 — Calendário Dinâmico</h1>
 <p>Assine no Google Calendar e os jogos atualizam sozinhos (placar dos jogos disputados e
 confrontos do mata-mata conforme são definidos).</p>
+<div class="box">
+<b>🎮 Bracket interativo (grupos + chaveamento):</b><br>
+<a href="/bracket" style="font-size:16px">Abrir o chaveamento interativo →</a>
+</div>
 <div class="box">
 <b>Calendário completo:</b><br><code id="full"></code><br><br>
 <b>Só jogos do Brasil:</b><br><code id="br"></code>
