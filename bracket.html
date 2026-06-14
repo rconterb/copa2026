@@ -98,6 +98,29 @@
   .footer b{color:var(--amarelo);}
   .hidden{display:none;}
 
+  /* ===== LOGIN ===== */
+  .login-screen{position:fixed;inset:0;z-index:50;background:linear-gradient(160deg,#0a1f0a,#04120a);
+    display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-card{background:var(--card);border:1px solid var(--linha);border-radius:18px;
+    padding:28px 22px;max-width:360px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+  .login-emoji{font-size:46px;margin-bottom:6px;}
+  .login-card h2{color:var(--amarelo);font-size:20px;margin:4px 0 8px;}
+  .login-card p{color:var(--txt2);font-size:13px;line-height:1.5;margin-bottom:18px;}
+  .login-card input{width:100%;box-sizing:border-box;padding:13px 14px;border-radius:11px;
+    border:1px solid var(--linha);background:#0a1f0a;color:#fff;font-size:16px;margin-bottom:10px;}
+  .login-card input:focus{outline:none;border-color:var(--verde);}
+  .login-card button{width:100%;padding:13px;border:none;border-radius:11px;cursor:pointer;
+    background:linear-gradient(135deg,#1eb85a,#009739);color:#fff;font-size:16px;font-weight:800;font-family:inherit;}
+  .login-card button:active{transform:scale(.98);}
+  .login-card small{display:block;color:var(--txt2);font-size:10.5px;margin-top:14px;line-height:1.4;}
+  .login-msg{font-size:12px;min-height:16px;margin-top:8px;color:var(--amarelo);}
+
+  /* ===== BARRA DE USUÁRIO ===== */
+  .userbar{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;font-size:11px;color:rgba(255,255,255,.85);}
+  .userbar .savestate{color:#bff0c8;font-size:10px;}
+  .userbar .logout{background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.25);color:#fff;
+    font-size:10px;padding:3px 9px;border-radius:8px;cursor:pointer;font-family:inherit;}
+
   /* ===== CALENDÁRIO ===== */
   .cal-wrap{max-width:600px;margin:0 auto;padding:12px;}
   .cal-sub{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:14px;margin-bottom:14px;}
@@ -130,7 +153,26 @@
     <button id="tabBracket">🏆 Chaveamento</button>
     <button id="tabCalendario">📅 Calendário</button>
   </div>
+  <div id="userBar" class="userbar hidden">
+    <span id="userWho"></span>
+    <span id="saveState" class="savestate"></span>
+    <button id="btnLogout" class="logout">sair</button>
+  </div>
 </header>
+
+<!-- ============ TELA DE LOGIN (e-mail) ============ -->
+<div id="login" class="login-screen">
+  <div class="login-card">
+    <div class="login-emoji">🏆</div>
+    <h2>Seu bolão da Copa 2026</h2>
+    <p>Entre com seu e-mail para salvar seus palpites e recuperá-los em qualquer aparelho.</p>
+    <input id="loginEmail" type="email" inputmode="email" autocomplete="email"
+           placeholder="seu@email.com" />
+    <button id="loginBtn">Entrar</button>
+    <div id="loginMsg" class="login-msg"></div>
+    <small>Sem senha — o e-mail só identifica seus palpites. Não use dados sensíveis.</small>
+  </div>
+</div>
 
 <div id="diag" style="display:none;background:#5a1a1a;color:#ffd0d0;font:12px monospace;padding:10px 14px;margin:8px;border-radius:8px;white-space:pre-wrap;word-break:break-word;"></div>
 
@@ -587,6 +629,93 @@ document.getElementById('calBr').onclick=function(){calMode='br';
   document.getElementById('calAll').classList.remove('active');
   setCalLinks();renderCalendar();};
 
+/* ============ PALPITES POR E-MAIL (salvar no servidor) ============ */
+var USER=null;            // e-mail logado
+var saveTimer=null;       // debounce
+function apiBase(){return (location.origin && location.origin.indexOf('http')===0)?location.origin:'';}
+
+/* captura o estado atual como objeto "palpite" */
+function snapshot(){
+  var w={}; for(var k in winners){ if(winners[k]&&winners[k].raw) w[k]=winners[k].raw; }
+  return {groups:GROUPS, thirds:[...thirdsIn], winners:w, v:1};
+}
+/* aplica um palpite salvo de volta no app */
+function restore(p){
+  try{
+    if(p && p.groups){ GROUPS=JSON.parse(JSON.stringify(p.groups)); }
+    if(p && Array.isArray(p.thirds)){ thirdsIn=new Set(p.thirds); }
+    renderGroups();
+    recalcFav();                       // monta favoritos base
+    if(p && p.winners){                // sobrepõe escolhas manuais salvas
+      for(var id in p.winners){
+        var raw=p.winners[id];
+        var c=comp(id);
+        if(!c) continue;
+        for(var i=0;i<c.length;i++){ if(c[i]&&c[i].raw===raw){ winners[id]=c[i]; break; } }
+      }
+    }
+  }catch(e){ /* se algo falhar, segue com o estado padrão */ }
+}
+
+function setSaveState(txt){ var s=document.getElementById('saveState'); if(s)s.textContent=txt; }
+function scheduleSave(){
+  if(!USER) return;
+  setSaveState('salvando…');
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(doSave, 700);   // debounce: agrupa mudanças rápidas
+}
+function doSave(){
+  if(!USER) return;
+  fetch(apiBase()+'/palpite',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email:USER,palpite:snapshot()})
+  }).then(function(r){return r.json();}).then(function(d){
+    setSaveState(d&&d.ok?'✓ salvo':'erro ao salvar');
+  }).catch(function(){ setSaveState('offline — não salvou'); });
+}
+
+/* envolve as funções que mudam estado para autossalvar */
+var _renderGroups=renderGroups, _recalcFav=recalcFav, _pick=pick;
+renderGroups=function(){_renderGroups.apply(this,arguments);};
+recalcFav=function(){_recalcFav.apply(this,arguments); if(USER)scheduleSave();};
+pick=function(){_pick.apply(this,arguments); if(USER)scheduleSave();};
+
+/* login */
+function entrar(email){
+  var e=(email||'').trim().toLowerCase();
+  var msg=document.getElementById('loginMsg');
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){ msg.textContent='Digite um e-mail válido.'; return; }
+  msg.textContent='Entrando…';
+  USER=e;
+  try{ localStorage.setItem('copa_email',e); }catch(_){}
+  // carrega palpite salvo do servidor
+  fetch(apiBase()+'/palpite?email='+encodeURIComponent(e))
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.ok&&d.encontrado&&d.palpite){ restore(d.palpite); }
+      finishLogin(e);
+    })
+    .catch(function(){ finishLogin(e); });  // sem servidor, entra mesmo assim
+}
+function finishLogin(e){
+  document.getElementById('login').classList.add('hidden');
+  var ub=document.getElementById('userBar'); ub.classList.remove('hidden');
+  document.getElementById('userWho').textContent='👤 '+e;
+  setSaveState('');
+  drawBracket();
+}
+function sair(){
+  USER=null;
+  try{ localStorage.removeItem('copa_email'); }catch(_){}
+  document.getElementById('userBar').classList.add('hidden');
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginMsg').textContent='';
+  document.getElementById('login').classList.remove('hidden');
+}
+document.getElementById('loginBtn').onclick=function(){entrar(document.getElementById('loginEmail').value);};
+document.getElementById('loginEmail').addEventListener('keydown',function(ev){ if(ev.key==='Enter')entrar(this.value); });
+document.getElementById('btnLogout').onclick=sair;
+
 /* init — com autodiagnóstico visível (se algo falhar no Safari, mostra na tela) */
 window.addEventListener('error',function(ev){
   var d=document.getElementById('diag');
@@ -596,6 +725,9 @@ window.addEventListener('error',function(ev){
 try{
   renderGroups();
   recalcFav();
+  // se já logou antes neste aparelho, entra direto
+  var saved=null; try{ saved=localStorage.getItem('copa_email'); }catch(_){}
+  if(saved){ document.getElementById('loginEmail').value=saved; entrar(saved); }
 }catch(e){
   var d=document.getElementById('diag');
   if(d){d.style.display='block';d.textContent='ERRO init: '+(e&&e.message?e.message:e)+'  ['+(e&&e.name?e.name:'')+']';}

@@ -21,17 +21,24 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import json
+import os
 import re
 import time
 from typing import Any
 from zoneinfo import ZoneInfo
 
 import httpx
-from fastapi import FastAPI, Response
-from fastapi.responses import HTMLResponse, PlainTextResponse, FileResponse
+from fastapi import FastAPI, Response, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, FileResponse, JSONResponse
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
+
+# Onde guardar os palpites. No Railway, se houver um Volume montado em /data,
+# usa ele (persiste entre deploys). Senão, usa um arquivo local.
+STORE_DIR = Path("/data") if Path("/data").is_dir() else BASE_DIR
+PALPITES_FILE = STORE_DIR / "palpites.json"
 
 # ----------------------------------------------------------------------------
 # Configuração
@@ -305,6 +312,74 @@ def jogos_json():
 @app.get("/health")
 def health():
     return {"ok": True, "matches_cached": len(_cache["data"] or [])}
+
+
+# ----------------------------------------------------------------------------
+# Palpites por e-mail (identificação simples, sem senha — bolão entre amigos)
+# ----------------------------------------------------------------------------
+def _norm_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _valid_email(email: str) -> bool:
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email or ""))
+
+
+def _load_all() -> dict:
+    try:
+        if PALPITES_FILE.exists():
+            return json.loads(PALPITES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _save_all(data: dict) -> bool:
+    try:
+        tmp = PALPITES_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        os.replace(tmp, PALPITES_FILE)
+        return True
+    except Exception:
+        return False
+
+
+@app.get("/palpite")
+def carregar_palpite(email: str = ""):
+    """Carrega os palpites salvos de um e-mail. Sem e-mail válido, devolve vazio."""
+    e = _norm_email(email)
+    if not _valid_email(e):
+        return JSONResponse({"ok": False, "erro": "email_invalido"}, status_code=400)
+    data = _load_all()
+    rec = data.get(e)
+    if not rec:
+        return {"ok": True, "encontrado": False, "palpite": None}
+    return {"ok": True, "encontrado": True, "palpite": rec.get("palpite"),
+            "atualizado": rec.get("atualizado")}
+
+
+@app.post("/palpite")
+async def salvar_palpite(req: Request):
+    """Salva os palpites de um e-mail. Corpo JSON: {email, palpite}."""
+    try:
+        body = await req.json()
+    except Exception:
+        return JSONResponse({"ok": False, "erro": "json_invalido"}, status_code=400)
+    e = _norm_email(body.get("email", ""))
+    palpite = body.get("palpite")
+    if not _valid_email(e):
+        return JSONResponse({"ok": False, "erro": "email_invalido"}, status_code=400)
+    if not isinstance(palpite, dict):
+        return JSONResponse({"ok": False, "erro": "palpite_invalido"}, status_code=400)
+    # limite de tamanho simples (anti-abuso)
+    if len(json.dumps(palpite)) > 20000:
+        return JSONResponse({"ok": False, "erro": "palpite_grande"}, status_code=413)
+    data = _load_all()
+    data[e] = {"palpite": palpite,
+               "atualizado": dt.datetime.now(dt.timezone.utc).isoformat()}
+    if not _save_all(data):
+        return JSONResponse({"ok": False, "erro": "falha_ao_salvar"}, status_code=500)
+    return {"ok": True}
 
 
 def _serve_app():
