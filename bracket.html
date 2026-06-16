@@ -1,4 +1,4 @@
-<!-- COPA2026 BUILD: login-sincrono-v3 -->
+<!-- COPA2026 BUILD: login-sincrono-v5 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -97,7 +97,7 @@
 
   .footer{font-size:10.5px;color:var(--txt2);line-height:1.6;padding:8px 18px;max-width:600px;margin:0 auto;}
   .footer b{color:var(--amarelo);}
-  .hidden{display:none;}
+  .hidden{display:none !important;}
 
   /* ===== LOGIN ===== */
   .login-screen{position:fixed;inset:0;z-index:50;background:linear-gradient(160deg,#0a1f0a,#04120a);
@@ -713,7 +713,11 @@ function finishLogin(e){
   var lg=document.getElementById('login'); if(lg) lg.classList.add('hidden');
   var ub=document.getElementById('userBar'); if(ub) ub.classList.remove('hidden');
   var uw=document.getElementById('userWho'); if(uw) uw.textContent='👤 '+e;
-  try{ drawBracket(); }catch(_){}
+  try{ show('grupos'); }catch(_){ 
+    // fallback: mostra grupos na marra se show() falhar
+    var g=document.getElementById('view-grupos'); if(g) g.classList.remove('hidden');
+  }
+  try{ renderGroups(); recalcFav(); }catch(_){}
 }
 function sair(){
   USER=null;
