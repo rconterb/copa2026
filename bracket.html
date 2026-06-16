@@ -688,21 +688,40 @@ function entrar(email){
   msg.textContent='Entrando…';
   USER=e;
   try{ localStorage.setItem('copa_email',e); }catch(_){}
+
+  // garante que NUNCA trava: se em 6s não logou, entra mesmo assim
+  var done=false;
+  function go(p){
+    if(done) return; done=true;
+    try{ if(p){ restore(p); } }catch(err){ /* segue padrão */ }
+    try{ finishLogin(e); }
+    catch(err){ msg.textContent='Erro ao abrir: '+(err&&err.message?err.message:err); }
+  }
+  var killer=setTimeout(function(){ go(null); }, 6000);
+
   // carrega palpite salvo do servidor
-  fetch(apiBase()+'/palpite?email='+encodeURIComponent(e))
-    .then(function(r){return r.json();})
+  var url=apiBase()+'/palpite?email='+encodeURIComponent(e);
+  fetch(url)
+    .then(function(r){ return r.json(); })
     .then(function(d){
-      if(d&&d.ok&&d.encontrado&&d.palpite){ restore(d.palpite); }
-      finishLogin(e);
+      clearTimeout(killer);
+      go((d&&d.ok&&d.encontrado&&d.palpite)?d.palpite:null);
     })
-    .catch(function(){ finishLogin(e); });  // sem servidor, entra mesmo assim
+    .catch(function(err){
+      clearTimeout(killer);
+      // sem servidor/erro de rede: entra mesmo assim (offline)
+      go(null);
+    });
 }
 function finishLogin(e){
   document.getElementById('login').classList.add('hidden');
   var ub=document.getElementById('userBar'); ub.classList.remove('hidden');
   document.getElementById('userWho').textContent='👤 '+e;
   setSaveState('');
-  drawBracket();
+  try{ drawBracket(); }catch(err){
+    var d=document.getElementById('diag');
+    if(d){d.style.display='block';d.textContent='Aviso ao montar chaveamento: '+(err&&err.message?err.message:err);}
+  }
 }
 function sair(){
   USER=null;
