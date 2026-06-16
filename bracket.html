@@ -1,3 +1,4 @@
+<!-- COPA2026 BUILD: login-sincrono-v3 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -685,43 +686,34 @@ function entrar(email){
   var e=(email||'').trim().toLowerCase();
   var msg=document.getElementById('loginMsg');
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)){ msg.textContent='Digite um e-mail válido.'; return; }
-  msg.textContent='Entrando…';
   USER=e;
   try{ localStorage.setItem('copa_email',e); }catch(_){}
 
-  // garante que NUNCA trava: se em 6s não logou, entra mesmo assim
-  var done=false;
-  function go(p){
-    if(done) return; done=true;
-    try{ if(p){ restore(p); } }catch(err){ /* segue padrão */ }
-    try{ finishLogin(e); }
-    catch(err){ msg.textContent='Erro ao abrir: '+(err&&err.message?err.message:err); }
-  }
-  var killer=setTimeout(function(){ go(null); }, 6000);
+  // 1) ENTRA NA HORA (síncrono) — a tela nunca fica presa, aconteça o que acontecer
+  try{ finishLogin(e); }catch(_){}
 
-  // carrega palpite salvo do servidor
+  // 2) DEPOIS, em segundo plano, tenta puxar o palpite salvo do servidor
+  setSaveState('carregando…');
   var url=apiBase()+'/palpite?email='+encodeURIComponent(e);
-  fetch(url)
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      clearTimeout(killer);
-      go((d&&d.ok&&d.encontrado&&d.palpite)?d.palpite:null);
-    })
-    .catch(function(err){
-      clearTimeout(killer);
-      // sem servidor/erro de rede: entra mesmo assim (offline)
-      go(null);
-    });
+  try{
+    fetch(url)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d&&d.ok&&d.encontrado&&d.palpite){
+          try{ restore(d.palpite); drawBracket(); }catch(_){}
+          setSaveState('✓ palpite carregado');
+        }else{
+          setSaveState('');
+        }
+      })
+      .catch(function(){ setSaveState('offline — salva quando voltar'); });
+  }catch(_){ setSaveState(''); }
 }
 function finishLogin(e){
-  document.getElementById('login').classList.add('hidden');
-  var ub=document.getElementById('userBar'); ub.classList.remove('hidden');
-  document.getElementById('userWho').textContent='👤 '+e;
-  setSaveState('');
-  try{ drawBracket(); }catch(err){
-    var d=document.getElementById('diag');
-    if(d){d.style.display='block';d.textContent='Aviso ao montar chaveamento: '+(err&&err.message?err.message:err);}
-  }
+  var lg=document.getElementById('login'); if(lg) lg.classList.add('hidden');
+  var ub=document.getElementById('userBar'); if(ub) ub.classList.remove('hidden');
+  var uw=document.getElementById('userWho'); if(uw) uw.textContent='👤 '+e;
+  try{ drawBracket(); }catch(_){}
 }
 function sair(){
   USER=null;
