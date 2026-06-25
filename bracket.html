@@ -1,4 +1,4 @@
-<!-- COPA2026 BUILD: fixar-definidos-v8 -->
+<!-- COPA2026 BUILD: terceiros-fifa-v9 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -55,6 +55,7 @@
   .grip{color:var(--txt2);font-size:13px;}
   .row .q3tag{font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;}
   .q3tag.in{background:var(--q1);color:#0a1f0a;} .q3tag.out{background:var(--out);color:#e8b0b0;}
+  .q3tag.mid{background:rgba(255,200,60,.22);color:#ffd27a;}
   /* probabilidades por posição */
   .prob{display:flex;gap:2px;align-items:center;margin-left:4px;flex-shrink:0;}
   .prob .pb{width:26px;text-align:center;font-size:8px;font-weight:800;padding:2px 0;border-radius:3px;line-height:1.1;}
@@ -314,13 +315,18 @@ const NOME2KEY={
 };
 function pVit(fa,fb){ return 1/(1+Math.pow(10,(fb-fa)/400)); }
 function simJogo(a,b){
+  // retorna [golsA, golsB] simulados a partir da força (modelo de Poisson simples)
   var fa=FORCA[a]||1700, fb=FORCA[b]||1700;
-  var pA=pVit(fa,fb);
-  var pE=0.26*(1-Math.abs(pA-0.5));
-  var r=Math.random();
-  if(r<pE) return [1,1];
-  var pAaj=pA*(1-pE);
-  return (r<pE+pAaj)?[3,0]:[0,3];
+  var pA=pVit(fa,fb);                 // prob de vitória de A (referência)
+  // expectativa de gols: time mais forte marca mais. Base ~1.35 gols/time.
+  var lamA=1.35*Math.exp((pA-0.5)*1.6);
+  var lamB=1.35*Math.exp((0.5-pA)*1.6);
+  return [poisson(lamA), poisson(lamB)];
+}
+function poisson(lam){
+  var L=Math.exp(-lam), k=0, p=1;
+  do{ k++; p*=Math.random(); }while(p>L);
+  return k-1;
 }
 /* resultados reais por grupo, lidos de /jogos.json (preenchido sob demanda) */
 var REAL={};   // { 'C': [{a:key,b:key,ga,gb}], ... }
@@ -332,53 +338,94 @@ function jogosDoGrupo(times){
   for(var i=0;i<times.length;i++)for(var j=i+1;j<times.length;j++)js.push({a:times[i],b:times[j]});
   return js;
 }
-/* simula um grupo N vezes -> probabilidade de cada posição */
-function simGrupo(times, feitos, N){
-  var pos={}; times.forEach(function(t){pos[t]={p1:0,p2:0,p3:0,p4:0};});
-  // monta lista de "restantes" = todos os pares que ainda não têm resultado real
-  var feitoSet={};
-  feitos.forEach(function(j){ feitoSet[j.a+'|'+j.b]=1; feitoSet[j.b+'|'+j.a]=1; });
-  var todos=jogosDoGrupo(times);
-  var restantes=todos.filter(function(j){ return !feitoSet[j.a+'|'+j.b]; });
-  for(var it=0;it<N;it++){
-    var pts={}, sg={}; times.forEach(function(t){pts[t]=0;sg[t]=0;});
-    feitos.forEach(function(j){
-      if(j.ga>j.gb)pts[j.a]+=3; else if(j.gb>j.ga)pts[j.b]+=3; else {pts[j.a]++;pts[j.b]++;}
-      sg[j.a]+=(j.ga-j.gb); sg[j.b]+=(j.gb-j.ga);
-    });
-    restantes.forEach(function(j){
-      var r=simJogo(j.a,j.b); pts[j.a]+=r[0]; pts[j.b]+=r[1];
-      if(r[0]>r[1]){sg[j.a]++;sg[j.b]--;} else if(r[1]>r[0]){sg[j.b]++;sg[j.a]--;}
-    });
-    var rank=times.slice().sort(function(x,y){ return (pts[y]-pts[x])||(sg[y]-sg[x])||(Math.random()-0.5); });
-    pos[rank[0]].p1++; pos[rank[1]].p2++; pos[rank[2]].p3++; pos[rank[3]].p4++;
+/* simula UM grupo uma vez -> retorna stats finais por time {pts,gd,gf} e o ranking */
+function simGrupoUmaVez(times, feitos, restantes){
+  var pts={}, gd={}, gf={};
+  times.forEach(function(t){pts[t]=0;gd[t]=0;gf[t]=0;});
+  function aplica(a,b,ga,gb){
+    if(ga>gb)pts[a]+=3; else if(gb>ga)pts[b]+=3; else {pts[a]++;pts[b]++;}
+    gd[a]+=(ga-gb); gd[b]+=(gb-ga); gf[a]+=ga; gf[b]+=gb;
   }
-  var out={};
-  var completos=(restantes.length===0); // grupo encerrado: todos os jogos jogados
-  times.forEach(function(t){
-    var o={
-      p1:Math.round(pos[t].p1/N*100), p2:Math.round(pos[t].p2/N*100),
-      p3:Math.round(pos[t].p3/N*100), p4:Math.round(pos[t].p4/N*100)
-    };
-    // posição DEFINIDA: aparece em 100% das simulações na mesma posição
-    o.fixo = (o.p1===100?1 : o.p2===100?2 : o.p3===100?3 : o.p4===100?4 : 0);
-    // classificação garantida (sempre top 2) ou eliminado (nunca top 2)
-    var classif=pos[t].p1+pos[t].p2;
-    o.garantido = (classif===N);   // sempre passa entre os 2 primeiros
-    o.eliminado = (classif===0 && pos[t].p3<N); // nunca passa direto (3º ainda pode via melhor terceiro)
-    o.semChance = ((pos[t].p1+pos[t].p2+pos[t].p3)===0); // nem como 3º -> fora de tudo
-    o.grupoCompleto = completos;
-    return out[t]=o;
+  feitos.forEach(function(j){ aplica(j.a,j.b,j.ga,j.gb); });
+  restantes.forEach(function(j){ var r=simJogo(j.a,j.b); aplica(j.a,j.b,r[0],r[1]); });
+  var rank=times.slice().sort(function(x,y){
+    return (pts[y]-pts[x])||(gd[y]-gd[x])||(gf[y]-gf[x])||(Math.random()-0.5);
   });
-  return out;
+  return {rank:rank, pts:pts, gd:gd, gf:gf};
 }
+
+/* MOTOR PRINCIPAL: simula TODOS os grupos juntos N vezes.
+   Em cada iteração ranqueia os 12 terceiros pela regra FIFA (pts→saldo→gols)
+   e marca os 8 melhores. Acumula probabilidades de posição e de classificação. */
+function calcularProbabilidades(N){
+  N=N||30000;
+  var gs=Object.keys(GROUPS);
+  // pré-computa feitos/restantes de cada grupo
+  var feitosG={}, restG={}, completosG={};
+  gs.forEach(function(g){
+    var times=GROUPS[g];
+    var feitos=(REAL[g]||[]).filter(function(j){return times.indexOf(j.a)>=0&&times.indexOf(j.b)>=0;});
+    var fset={}; feitos.forEach(function(j){fset[j.a+'|'+j.b]=1;fset[j.b+'|'+j.a]=1;});
+    var rest=jogosDoGrupo(times).filter(function(j){return !fset[j.a+'|'+j.b];});
+    feitosG[g]=feitos; restG[g]=rest; completosG[g]=(rest.length===0);
+  });
+  // acumuladores
+  var cnt={}; // cnt[g][time] = {p1,p2,p3,p4, classif3} (classif3 = vezes que o 3º daquele time entrou nas 8 vagas)
+  gs.forEach(function(g){ cnt[g]={}; GROUPS[g].forEach(function(t){cnt[g][t]={p1:0,p2:0,p3:0,p4:0,q3:0};}); });
+
+  for(var it=0;it<N;it++){
+    var terceiros=[]; // {g, time, pts, gd, gf}
+    gs.forEach(function(g){
+      var s=simGrupoUmaVez(GROUPS[g], feitosG[g], restG[g]);
+      var r=s.rank;
+      cnt[g][r[0]].p1++; cnt[g][r[1]].p2++; cnt[g][r[2]].p3++; cnt[g][r[3]].p4++;
+      var t3=r[2];
+      terceiros.push({g:g,time:t3,pts:s.pts[t3],gd:s.gd[t3],gf:s.gf[t3]});
+    });
+    // ranqueia os 12 terceiros pela regra FIFA: pontos -> saldo -> gols marcados
+    terceiros.sort(function(x,y){ return (y.pts-x.pts)||(y.gd-x.gd)||(y.gf-x.gf)||(Math.random()-0.5); });
+    // os 8 primeiros classificam
+    for(var k=0;k<8;k++){ var tt=terceiros[k]; cnt[tt.g][tt.time].q3++; }
+  }
+
+  // consolida em PROB
+  PROB={};
+  gs.forEach(function(g){
+    PROB[g]={};
+    GROUPS[g].forEach(function(t){
+      var c=cnt[g][t];
+      var o={
+        p1:Math.round(c.p1/N*100), p2:Math.round(c.p2/N*100),
+        p3:Math.round(c.p3/N*100), p4:Math.round(c.p4/N*100),
+        q3:Math.round(c.q3/N*100)               // prob de classificar COMO terceiro
+      };
+      o.fixo = (c.p1===N?1 : c.p2===N?2 : c.p3===N?3 : c.p4===N?4 : 0);
+      o.garantido = ((c.p1+c.p2)===N);           // sempre top 2
+      // classificado de fato: top2 garantido OU (é 3º E sempre entra nas 8 vagas)
+      o.classGarantida = o.garantido || (c.p3===N && c.q3===N) || ((c.p1+c.p2+c.q3)>=N && (c.p1+c.p2+c.p3)===N && c.q3===N);
+      o.semChance = ((c.p1+c.p2+c.p3)===0) || ((c.p1+c.p2)===0 && c.q3===0);
+      o.grupoCompleto = completosG[g];
+      PROB[g][t]=o;
+    });
+    // reordena o grupo pela expectativa de posição (melhor primeiro)
+    GROUPS[g].sort(function(x,y){
+      var px=PROB[g][x], py=PROB[g][y];
+      var ex=1*px.p1+2*px.p2+3*px.p3+4*px.p4;
+      var ey=1*py.p1+2*py.p2+3*py.p3+4*py.p4;
+      return ex-ey;
+    });
+  });
+  // define os 8 grupos cujos terceiros mais provavelmente classificam (para o bracket)
+  escolherMelhoresTerceiros();
+}
+
 /* busca os resultados reais de /jogos.json e organiza por grupo */
 function carregarResultadosReais(){
   var base=(location.origin&&location.origin.indexOf('http')===0)?location.origin:'';
   return fetch(base+'/jogos.json').then(function(r){return r.json();}).then(function(d){
     REAL={};
     (d.matches||[]).forEach(function(m){
-      if(!m.placar) return;                 // só jogos já disputados
+      if(!m.placar) return;
       var fase=(m.fase||'');
       var gm=fase.match(/Group\s+([A-L])/i) || fase.match(/Grupo\s+([A-L])/i);
       if(!gm) return;
@@ -392,34 +439,13 @@ function carregarResultadosReais(){
     return REAL;
   }).catch(function(){ REAL={}; return REAL; });
 }
-/* roda o cálculo para todos os grupos e reordena por probabilidade */
-function calcularProbabilidades(N){
-  N=N||30000;
-  PROB={};
-  Object.keys(GROUPS).forEach(function(g){
-    var times=GROUPS[g];
-    var feitos=(REAL[g]||[]).filter(function(j){ return times.indexOf(j.a)>=0 && times.indexOf(j.b)>=0; });
-    var pr=simGrupo(times, feitos, N);
-    PROB[g]=pr;
-    // reordena o grupo pela probabilidade de posição (1º mais provável primeiro)
-    // score = expectativa de posição (menor = melhor)
-    times.sort(function(x,y){
-      var ex=1*pr[x].p1+2*pr[x].p2+3*pr[x].p3+4*pr[x].p4;
-      var ey=1*pr[y].p1+2*pr[y].p2+3*pr[y].p3+4*pr[y].p4;
-      return ex-ey;
-    });
-  });
-  // escolhe os 8 melhores 3ºs automaticamente (maior prob de classificar entre os 3ºs)
-  escolherMelhoresTerceiros();
-}
-/* define thirdsIn com os 8 grupos cujo 3º colocado tem maior prob de classificar */
+
+/* escolhe os 8 grupos cujo 3º tem maior prob de classificar (q3) p/ marcar no bracket */
 function escolherMelhoresTerceiros(){
   if(!PROB) return;
   var arr=Object.keys(GROUPS).map(function(g){
     var terceiro=GROUPS[g][2];
-    var pr=PROB[g][terceiro]||{p1:0,p2:0};
-    // "força" do 3º = prob de ter ido bem (p1+p2 alto indica grupo onde o 3º é forte)
-    return {g:g, score:(pr.p1+pr.p2)};
+    return {g:g, score:(PROB[g][terceiro]?PROB[g][terceiro].q3:0)};
   });
   arr.sort(function(a,b){ return b.score-a.score; });
   thirdsIn=new Set(arr.slice(0,8).map(function(x){return x.g;}));
@@ -573,13 +599,27 @@ function renderGroups(){
     h+=`<div class="grp${calcOn?' calc-on':''}"><h3>Grupo ${g} <span class="gdates">📅 ${GDATES[g]||""}</span>${calcOn?'<span class="calc-badge">⚡ por força/resultados</span>':''}</h3>`;
     GROUPS[g].forEach((n,i)=>{
       const pos=i+1; const isBr=n===BR;
+      const p=(calcOn && PROB[g] && PROB[g][n])?PROB[g][n]:null;
       let tag="";
-      if(pos===3){const inn=thirdsIn.has(g);tag=`<span class="q3tag ${inn?'in':'out'}">${inn?'CLASSIF.':'FORA'}</span>`;}
+      if(pos===3){
+        if(p){
+          // probabilidade REAL de o 3º classificar (ranking dos 12 terceiros, regra FIFA)
+          if(p.grupoCompleto){
+            const inn=thirdsIn.has(g);
+            tag=`<span class="q3tag ${inn?'in':'out'}">${inn?'✓ 3º CLASSIF.':'3º FORA'}</span>`;
+          }else{
+            const q=p.q3;
+            const cls=q>=70?'in':(q<=25?'out':'mid');
+            tag=`<span class="q3tag ${cls}">3º: ${q}% vaga</span>`;
+          }
+        }else{
+          const inn=thirdsIn.has(g);
+          tag=`<span class="q3tag ${inn?'in':'out'}">${inn?'CLASSIF.':'FORA'}</span>`;
+        }
+      }
       let prob="";
-      if(calcOn && PROB[g] && PROB[g][n]){
-        const p=PROB[g][n];
+      if(p){
         if(p.fixo){
-          // posição matematicamente definida — trava com cadeado
           const lbl=p.grupoCompleto?'ENCERRADO':'DEFINIDO';
           prob=`<span class="prob"><span class="locked">🔒 ${p.fixo}º ${lbl}</span></span>`;
         }else{
