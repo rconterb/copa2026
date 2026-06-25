@@ -59,8 +59,9 @@ SELECOES_PRINCIPAIS = {
 TEAM_PT = {
     "Mexico": "México", "South Africa": "África do Sul", "South Korea": "Coreia do Sul",
     "Czech Republic": "Rep. Tcheca", "Canada": "Canadá", "Bosnia and Herzegovina": "Bósnia",
+    "Bosnia & Herzegovina": "Bósnia", "Bosnia": "Bósnia",
     "Qatar": "Catar", "Switzerland": "Suíça", "Brazil": "Brasil", "Morocco": "Marrocos",
-    "Haiti": "Haiti", "Scotland": "Escócia", "United States": "EUA", "Paraguay": "Paraguai",
+    "Haiti": "Haiti", "Scotland": "Escócia", "United States": "EUA", "USA": "EUA", "Paraguay": "Paraguai",
     "Australia": "Austrália", "Turkey": "Turquia", "Türkiye": "Turquia", "Germany": "Alemanha",
     "Curacao": "Curaçao", "Curaçao": "Curaçao", "Ivory Coast": "Costa do Marfim",
     "Cote d'Ivoire": "Costa do Marfim", "Ecuador": "Equador", "Netherlands": "Holanda",
