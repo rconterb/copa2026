@@ -1,4 +1,4 @@
-<!-- COPA2026 BUILD: terceiros-fifa-v9 -->
+<!-- COPA2026 BUILD: terceiros-fifa-v10 -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -468,12 +468,17 @@ const R32DEF={
   M85:["1B","3?"],   M86:["1J","2H"],    // -> M95   (corrigido: 1B/2H)
   M87:["1K","3?"],   M88:["2D","2G"],    // -> M96   (corrigido: 2D x 2G)
 };
-/* ordem dos slots de 3º conforme aparecem (grupo do 1º que os recebe) */
+/* slots de 3º com os GRUPOS PERMITIDOS oficiais da FIFA (regulamento 2026).
+   Cada líder só pode enfrentar terceiros vindos destes grupos. */
 const THIRD_SLOTS=[
-  {match:"M74",host:"E"},{match:"M77",host:"I"},
-  {match:"M81",host:"D"},{match:"M82",host:"G"},
-  {match:"M79",host:"A"},{match:"M80",host:"L"},
-  {match:"M85",host:"B"},{match:"M87",host:"K"},
+  {match:"M74",host:"E",ok:["A","B","C","D","F"]},   // 1E (Alemanha) x 3º A/B/C/D/F
+  {match:"M77",host:"I",ok:["C","D","F","G","H"]},   // 1I (França)   x 3º C/D/F/G/H
+  {match:"M81",host:"D",ok:["B","E","F","I","J"]},   // 1D (EUA)      x 3º B/E/F/I/J
+  {match:"M82",host:"G",ok:["A","E","H","I","J"]},   // 1G           x 3º A/E/H/I/J
+  {match:"M79",host:"A",ok:["C","E","F","H","I"]},   // 1A (México)  x 3º C/E/F/H/I
+  {match:"M80",host:"L",ok:["E","H","I","J","K"]},   // 1L           x 3º E/H/I/J/K
+  {match:"M85",host:"B",ok:["E","F","G","I","J"]},   // 1B (Suíça)   x 3º E/F/G/I/J
+  {match:"M87",host:"K",ok:["D","E","I","J","L"]},   // 1K           x 3º D/E/I/J/L
 ];
 const OIT=[
   {id:"M91",src:["M73","M75"]},{id:"M89",src:["M74","M77"]},
@@ -522,24 +527,35 @@ let thirdAssign={}; // matchId -> letra do grupo do 3º
 function assignThirds(){
   thirdAssign={};
   const groups=[...thirdsIn];               // grupos com 3º classificado
-  const slots=THIRD_SLOTS.map(s=>({...s}));  // {match, host}
-  if(groups.length!==8){ return; }           // só monta quando exatamente 8
-  // backtracking simples p/ casar slot↔grupo evitando host==grupo
+  const slots=THIRD_SLOTS.map(s=>({...s}));
+  if(groups.length!==8){ return; }
+  // backtracking respeitando os GRUPOS PERMITIDOS de cada slot (regra FIFA)
+  // ordena slots pelos mais restritos primeiro (menos candidatos) p/ achar solução
   const used=new Set();
-  function solve(i){
-    if(i===slots.length) return true;
-    const host=slots[i].host;
-    // tenta primeiro grupos != host
-    const cand=groups.filter(g=>!used.has(g)).sort((a,b)=>(a===host)-(b===host));
-    for(const g of cand){
-      used.add(g); thirdAssign[slots[i].match]=g;
-      if(solve(i+1)) return true;
-      used.delete(g); delete thirdAssign[slots[i].match];
+  function candidatos(slot){
+    return groups.filter(g=>!used.has(g) && slot.ok.indexOf(g)>=0);
+  }
+  function solve(rem){
+    if(rem.length===0) return true;
+    // escolhe o slot com menos candidatos disponíveis (heurística MRV)
+    rem.sort((a,b)=>candidatos(a).length-candidatos(b).length);
+    const slot=rem[0], resto=rem.slice(1);
+    for(const g of candidatos(slot)){
+      used.add(g); thirdAssign[slot.match]=g;
+      if(solve(resto)) return true;
+      used.delete(g); delete thirdAssign[slot.match];
     }
     return false;
   }
-  if(!solve(0)){ // fallback: atribui em ordem mesmo com conflito
-    slots.forEach((s,i)=>thirdAssign[s.match]=groups[i]);
+  if(!solve(slots.slice())){
+    // fallback seguro: respeita 'ok' mesmo sem solução perfeita, senão host!=g
+    thirdAssign={}; const u2=new Set();
+    THIRD_SLOTS.forEach(function(s){
+      var c=groups.filter(g=>!u2.has(g)&&s.ok.indexOf(g)>=0);
+      if(!c.length) c=groups.filter(g=>!u2.has(g)&&g!==s.host);
+      if(!c.length) c=groups.filter(g=>!u2.has(g));
+      if(c.length){ u2.add(c[0]); thirdAssign[s.match]=c[0]; }
+    });
   }
 }
 
